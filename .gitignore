@@ -66,3 +66,4 @@ htmlcov/
 
 # Node-related (if using JS tools)
 node_modules/
+test_plan/

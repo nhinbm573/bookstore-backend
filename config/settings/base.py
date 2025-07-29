@@ -36,7 +36,10 @@ THIRD_PARTY_APPS = [
 ]
 
 # Local/Custom apps
-LOCAL_APPS = ["apps.core"]
+LOCAL_APPS = [
+    "apps.core",
+    "apps.accounts"
+]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -112,6 +115,9 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Custom user model
+AUTH_USER_MODEL = "accounts.Account"
 
 
 # Media files

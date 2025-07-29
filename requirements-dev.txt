@@ -47,3 +47,4 @@ faker==33.1.0
 # Testing Tools
 pytest-mock==3.14.0
 requests-mock==1.12.1
+freezegun==1.2.2
