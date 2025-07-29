@@ -13,11 +13,11 @@ class Account(AbstractBaseUser):
     is_admin = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
     objects = AccountManager()
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['phone', 'full_name', 'birthday']
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["phone", "full_name", "birthday"]
 
     class Meta:
-        db_table = 'accounts'
+        db_table = "accounts"
 
     def __str__(self):
         return self.email
