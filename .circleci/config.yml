@@ -116,7 +116,7 @@ jobs:
             mkdir -p ~/.ssh
             ssh-keyscan github.com >> ~/.ssh/known_hosts
             
-            BRANCH_NAME=main
+            BRANCH_NAME=${CIRCLE_BRANCH}
             echo "Backend branch: $BRANCH_NAME"
       
             for candidate in "$BRANCH_NAME" "dev" "main"; do
