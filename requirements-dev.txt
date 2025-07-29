@@ -1,0 +1,49 @@
+# requirements-dev.txt
+
+# Include production dependencies
+-r requirements.txt
+
+# Linting
+flake8==7.3.0
+mccabe==0.7.0
+pycodestyle==2.14.0
+pyflakes==3.4.0
+
+# Formatting
+black==25.1.0
+
+# Pre-commit
+pre-commit==4.2.0
+cfgv==3.4.0
+identify==2.6.12
+nodeenv==1.9.1
+virtualenv==20.31.2
+distlib==0.4.0
+filelock==3.18.0
+platformdirs==4.3.8
+pathspec==0.12.1
+PyYAML==6.0.2
+
+# Typing (optional)
+mypy_extensions==1.1.0
+
+# CLI helper
+click==8.2.1
+packaging==25.0
+
+# Testing Framework
+pytest==8.3.4
+pytest-django==4.10.0
+pytest-xdist==3.6.1
+
+# E2E Testing (Playwright)
+pytest-playwright==0.6.2
+playwright==1.50.0
+
+# Test Data Generation
+factory-boy==3.3.1
+faker==33.1.0
+
+# Testing Tools
+pytest-mock==3.14.0
+requests-mock==1.12.1

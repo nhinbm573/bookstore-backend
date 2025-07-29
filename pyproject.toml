@@ -1,0 +1,26 @@
+[tool.black]
+line-length = 88
+target-version = ['py310']
+exclude = '''
+/(
+    \.venv
+  | venv
+  | env
+  | migrations
+  | __pycache__
+  | settings.py
+)/
+'''
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.testing"
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+python_classes = "Test*"
+python_functions = "test_*"
+testpaths = ["apps", "e2e"]
+addopts = "--strict-markers --tb=short"
+
+markers = [
+    "unit: Fast, isolated tests within Django apps (e.g., apps/core/tests/)",
+    "e2e: Slower tests with external dependencies (e.g., e2e/)",
+]

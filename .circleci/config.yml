@@ -1,0 +1,212 @@
+version: 2.1
+
+
+jobs:
+  install_dependencies:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/backend
+    steps:
+      - checkout
+      - restore_cache:
+          name: "Restore Backend PIP Cache"
+          keys:
+            - v1-pip-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+            - v1-pip-
+      - run:
+          name: "Install Dependencies"
+          command: |
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements-dev.txt
+      - save_cache:
+          name: "Save Backend PIP Cache"
+          key: v1-pip-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          paths:
+            - venv
+
+
+  linter:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/backend
+    steps:
+      - checkout
+      - restore_cache:
+          name: "Restore Backend PIP Cache"
+          keys:
+            - v1-pip-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run:
+          name: "Run Linters"
+          command: |
+            source venv/bin/activate
+            
+            echo "Running flake8 for style guide enforcement..."
+            flake8 .
+            
+            echo "Running black to check formatting..."
+            black --check .
+            
+
+  unit_test:
+    docker:
+      - image: cimg/python:3.11
+        environment:
+          TEST_DB_NAME: bookstore_test
+          TEST_DB_USER: postgres
+          TEST_DB_PASSWORD: postgres
+          TEST_DB_HOST: localhost
+          TEST_DB_PORT: 5432
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_DB: bookstore_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+    working_directory: ~/backend
+    steps:
+      - checkout
+      - restore_cache:
+          name: "Restore Backend PIP Cache"
+          keys:
+            - v1-pip-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run:
+          name: "Wait for DB"
+          command: |
+            echo "Waiting for postgres..."
+            dockerize -wait tcp://localhost:5432 -timeout 1m
+            echo "Postgres is up!"
+      - run:
+          name: "Run Unit Tests"
+          command: |
+            source venv/bin/activate
+            echo "Running unit tests with pytest..."
+            pytest -m unit
+
+
+  e2e_test:
+    docker:
+      - image: cimg/python:3.11-browsers
+        environment:
+          TEST_DB_NAME: bookstore_test
+          TEST_DB_USER: postgres
+          TEST_DB_PASSWORD: postgres
+          TEST_DB_HOST: localhost
+          TEST_DB_PORT: 5432
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_DB: bookstore_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+    working_directory: ~/backend
+    environment:
+      GITHUB_HTTPS: https://github.com/BookStoreOrg/bookstore-frontend.git
+    steps:
+      # SETUP BACKEND
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-pip-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+
+
+      # SETUP FRONTEND
+      - run:
+          name: "Clone matching frontend branch (with fallback)"
+          command: |
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+            
+            BRANCH_NAME=main
+            echo "Backend branch: $BRANCH_NAME"
+      
+            for candidate in "$BRANCH_NAME" "dev" "main"; do
+              echo "Checking if frontend branch '$candidate' exists..."
+              if git ls-remote --exit-code --heads ${GITHUB_HTTPS} "$candidate"; then
+                echo "Found branch: $candidate. Cloning..."
+                rm -rf frontend
+                git clone --depth 1 --branch "$candidate" ${GITHUB_HTTPS} frontend
+                break
+              fi
+            done
+      - restore_cache:
+          name: "Restore Frontend NPM Cache"
+          keys:
+            - v1-npm-{{ checksum "frontend/package-lock.json" }}
+            - v1-npm-
+      - run:
+          name: "Install Frontend Dependencies"
+          working_directory: frontend
+          command: |
+            echo "Install frontend package..."
+            npm ci
+      - save_cache:
+          name: "Save Frontend NPM Cache"
+          key: v1-npm-{{ checksum "frontend/package-lock.json" }}
+          paths:
+            - frontend/node_modules
+
+
+      # SETUP DATABASE
+      - run:
+          name: "Wait for DB"
+          command: |
+            echo "Waiting for postgres..."
+            dockerize -wait tcp://localhost:5432 -timeout 1m
+            echo "Postgres is up!"
+
+
+      # SETUP PLAYWRIGHT
+      - run:
+          name: "Install Playwright"
+          command: |
+            source venv/bin/activate
+            playwright install
+
+
+      # RUN SERVICES
+      - run:
+          name: "Run Frontend Dev Server (background)"
+          working_directory: frontend
+          command: npm run dev > ../frontend-dev-server.log 2>&1
+          background: true
+      - run:
+          name: "Wait for Frontend Service"
+          command: |
+            echo "Waiting for frontend on port 5173..."
+            WAIT_TIMEOUT=60
+            ELAPSED_TIME=0
+            while ! nc -z localhost 5173; do
+              if [ $ELAPSED_TIME -ge $WAIT_TIMEOUT ]; then
+                echo "Error: Timed out waiting for frontend service to start."
+                echo "--- Frontend server logs ---"
+                cat ../frontend-dev-server.log
+                exit 1
+              fi
+              sleep 1
+              ELAPSED_TIME=$((ELAPSED_TIME + 1))
+            done
+            echo "Frontend service is up and running."
+
+
+      # TEST
+      - run:
+          name: "Run Playwright E2E Tests"
+          command: |
+            source venv/bin/activate
+            pytest -m e2e
+
+
+workflows:
+  build_and_test_workflow:
+    jobs:
+      - install_dependencies
+      - linter:
+          requires:
+            - install_dependencies
+      - unit_test:
+          requires:
+            - install_dependencies
+      - e2e_test:
+          requires:
+            - install_dependencies
+
