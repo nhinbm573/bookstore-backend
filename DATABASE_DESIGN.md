@@ -33,10 +33,10 @@ This table stores information about registered users of the system.
 This table organizes books into different categories.
 
 | Column Name  | Data Type      | Constraints          | Description                                 |
-| ------------ | -------------- | -------------------- | ------------------------------------------- |
+| ------------ | -------------- |----------------------| ------------------------------------------- |
 | `id`         | `UUID`         | `PRIMARY KEY`        | Unique identifier for the category.         |
 | `name`       | `VARCHAR(255)` | `NOT NULL`, `UNIQUE` | Name of the category.                       |
-| `sort_order` | `INTEGER`      | `NOT NULL`, `UNIQUE` | Determines the display order of categories. |
+| `sort_order` | `INTEGER`      | `NOT NULL`           | Determines the display order of categories. |
 
 ### Table: `Books`
 
