@@ -4,7 +4,7 @@
 
 ### Day 1 - Database Schema Setup
 - [X] Implement User model (custom AbstractUser with UUID, email login)
-- [ ] Create Category model with sort_order
+- [X] Create Category model with sort_order
 - [ ] Implement Book model with pricing, ratings, and M2M categories
 - [ ] Create supporting models (Comment, Order, OrderLine, ShoppingCart, ShoppingCartItem)
 - [ ] Write comprehensive model tests for all entities
