@@ -12,7 +12,7 @@ fi
 
 # 2. Activate virtual environment
 echo "🐍 Activating virtual environment..."
-source env/bin/activate
+source venv/bin/activate
 
 # 3. Upgrade pip
 echo "⬆️ Upgrading pip..."
