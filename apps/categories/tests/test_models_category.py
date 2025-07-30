@@ -9,7 +9,8 @@ from apps.categories.tests.factories import CategoryFactory
 
 # Model Field Tests
 
-## ID Field Tests
+
+# ID Field Tests
 @pytest.mark.unit
 def test_id_field_is_auto_field(category_model):
     """Test id field is AutoField with primary_key=True."""
@@ -34,7 +35,7 @@ def test_id_uniqueness(categories_batch):
     assert len(ids) == len(set(ids))
 
 
-## Name Field Tests
+# Name Field Tests
 @pytest.mark.unit
 def test_name_field_configuration(category_model):
     """Test name field max_length=255 and unique=True."""
@@ -86,7 +87,7 @@ def test_name_over_max_length():
     assert "name" in exc_info.value.message_dict
 
 
-## Sort Order Field Tests
+# Sort Order Field Tests
 @pytest.mark.unit
 def test_sort_order_field_type(category_model):
     """Test sort_order field is IntegerField."""
@@ -143,7 +144,7 @@ def test_meta_db_table(category_model):
 @pytest.mark.unit
 def test_meta_ordering(category_model):
     """Test default ordering is ['sort_order', 'name']."""
-    assert category_model._meta.ordering == ['sort_order', 'name']
+    assert category_model._meta.ordering == ["sort_order", "name"]
 
 
 # Model Method Tests
@@ -229,6 +230,7 @@ def test_duplicate_name_creation(category):
 def test_case_sensitive_uniqueness():
     """Test if 'Electronics' and 'electronics' are different."""
     from django.db import transaction
+
     CategoryFactory(name="Electronics")
     # This should work if case-sensitive
     try:
@@ -253,6 +255,7 @@ def test_update_to_existing_name(category_business, category_fiction):
 def test_uniqueness_with_whitespace():
     """Test if ' Electronics ' vs 'Electronics' are different."""
     from django.db import transaction
+
     CategoryFactory(name="Electronics")
     # This should work if whitespace matters
     try:
@@ -287,8 +290,8 @@ def test_sort_order_range(category_edge_cases):
 @pytest.mark.django_db
 def test_queryset_ordering(categories_ordered_by_sort):
     """Test categories are returned in correct order."""
-    ordered = Category.objects.all().order_by('sort_order', 'name')
-    names = list(ordered.values_list('name', flat=True))
+    ordered = Category.objects.all().order_by("sort_order", "name")
+    names = list(ordered.values_list("name", flat=True))
     assert names[0] == "First"
     assert names[1] == "Second"
     # Third and Fourth both have sort_order=30, so ordered by name
@@ -300,8 +303,8 @@ def test_queryset_ordering(categories_ordered_by_sort):
 @pytest.mark.django_db
 def test_ordering_with_same_sort_order(categories_same_sort_order):
     """Test name is used as secondary sort."""
-    ordered = Category.objects.filter(sort_order=50).order_by('sort_order', 'name')
-    names = list(ordered.values_list('name', flat=True))
+    ordered = Category.objects.filter(sort_order=50).order_by("sort_order", "name")
+    names = list(ordered.values_list("name", flat=True))
     assert names == ["Alpha", "Beta", "Gamma"]
 
 
@@ -329,8 +332,7 @@ def test_extremely_long_names():
     """Test with names at and beyond limit."""
     # At limit (255)
     category_at_limit = CategoryFactory.build(name="A" * 255)
-    category_at_limit.full_clean()  # Should not raise
-    
+    category_at_limit.full_clean()
     # Beyond limit (256)
     category_beyond = CategoryFactory.build(name="A" * 256)
     with pytest.raises(ValidationError) as exc_info:
@@ -345,7 +347,7 @@ def test_sql_injection_in_name():
     """Test proper escaping of SQL characters."""
     sql_injection_attempts = [
         "'; DROP TABLE categories; --",
-        "\" OR 1=1 --",
+        '" OR 1=1 --',
         "' UNION SELECT * FROM users --",
     ]
     for attempt in sql_injection_attempts:
@@ -409,7 +411,7 @@ def test_factory_build_vs_create():
     """Test build() doesn't save to DB."""
     built_category = CategoryFactory.build(name="Not Saved")
     assert built_category.pk is None
-    
+
     created_category = CategoryFactory.create(name="Saved")
     assert created_category.pk is not None
 
@@ -418,10 +420,7 @@ def test_factory_build_vs_create():
 @pytest.mark.django_db
 def test_factory_with_custom_values():
     """Test overriding default factory values."""
-    custom_category = CategoryFactory(
-        name="Custom Name",
-        sort_order=999
-    )
+    custom_category = CategoryFactory(name="Custom Name", sort_order=999)
     assert custom_category.name == "Custom Name"
     assert custom_category.sort_order == 999
 
@@ -449,9 +448,9 @@ def test_bulk_operations(empty_categories_db):
     for i in range(50):
         categories.append(Category(name=f"Bulk {i}", sort_order=i))
     Category.objects.bulk_create(categories)
-    
+
     assert Category.objects.count() == 50
-    
+
     # Bulk update
     Category.objects.filter(name__startswith="Bulk").update(sort_order=100)
     assert Category.objects.filter(sort_order=100).count() == 50
@@ -465,11 +464,11 @@ def test_filter_by_name(categories_test_set):
     result = Category.objects.filter(name="Technology")
     assert result.count() == 1
     assert result.first().name == "Technology"
-    
+
     # Case-insensitive contains
     result = Category.objects.filter(name__icontains="fiction")
     assert result.count() == 2  # Fiction and Non-Fiction
-    
+
     # Starts with
     result = Category.objects.filter(name__startswith="Non")
     assert result.count() == 1
@@ -483,11 +482,11 @@ def test_filter_by_sort_order(large_category_dataset):
     # Exact match
     result = Category.objects.filter(sort_order=50)
     assert result.exists()
-    
+
     # Range query
     result = Category.objects.filter(sort_order__gte=30, sort_order__lte=70)
     assert result.exists()
-    
+
     # Less than
     result = Category.objects.filter(sort_order__lt=20)
     assert result.exists()
@@ -498,17 +497,13 @@ def test_filter_by_sort_order(large_category_dataset):
 def test_complex_queries(categories_test_set):
     """Test combining multiple filters."""
     # Name contains AND sort_order range
-    result = Category.objects.filter(
-        name__icontains="e",
-        sort_order__gte=30
-    )
+    result = Category.objects.filter(name__icontains="e", sort_order__gte=30)
     assert result.exists()
-    
+
     # OR query using Q objects
     from django.db.models import Q
-    result = Category.objects.filter(
-        Q(name="Fiction") | Q(name="History")
-    )
+
+    result = Category.objects.filter(Q(name="Fiction") | Q(name="History"))
     assert result.count() == 2
 
 
@@ -519,12 +514,12 @@ def test_save_method_auto_sort_order():
     """Test auto-generation of sort_order when None."""
     # Create first category with explicit sort_order
     CategoryFactory(name="First", sort_order=100)
-    
+
     # Create category without sort_order (simulate None)
     category = Category(name="Auto Sort")
     category.sort_order = None
     category.save()
-    
+
     # Should be max + 10 = 110
     assert category.sort_order == 110
 
@@ -535,8 +530,8 @@ def test_save_method_preserves_explicit_sort_order():
     """Test that explicit sort_order is not overwritten."""
     category = CategoryFactory(name="Explicit", sort_order=50)
     original_sort = category.sort_order
-    
+
     category.name = "Updated Name"
     category.save()
-    
+
     assert category.sort_order == original_sort

@@ -41,13 +41,13 @@ jobs:
           name: "Run Linters"
           command: |
             source venv/bin/activate
-            
+
             echo "Running flake8 for style guide enforcement..."
             flake8 .
-            
+
             echo "Running black to check formatting..."
             black --check .
-            
+
 
   unit_test:
     docker:
@@ -115,10 +115,10 @@ jobs:
           command: |
             mkdir -p ~/.ssh
             ssh-keyscan github.com >> ~/.ssh/known_hosts
-            
+
             BRANCH_NAME=${CIRCLE_BRANCH}
             echo "Backend branch: $BRANCH_NAME"
-      
+
             for candidate in "$BRANCH_NAME" "dev" "main"; do
               echo "Checking if frontend branch '$candidate' exists..."
               if git ls-remote --exit-code --heads ${GITHUB_HTTPS} "$candidate"; then
@@ -198,4 +198,3 @@ workflows:
       - e2e_test:
           requires:
             - install_dependencies
-

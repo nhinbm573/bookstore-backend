@@ -3,6 +3,7 @@ from django.db import transaction
 from apps.categories.models import Category
 from apps.categories.tests.factories import CategoryFactory, create_test_categories_set
 
+
 @pytest.fixture
 def category_model():
     """Provide access to the Category model class."""
@@ -117,10 +118,7 @@ def large_category_dataset():
     """Create a large dataset of categories for performance testing."""
     categories = []
     for i in range(100):
-        categories.append(Category(
-            name=f"Category {i:03d}",
-            sort_order=(i % 10) * 10
-        ))
+        categories.append(Category(name=f"Category {i:03d}", sort_order=(i % 10) * 10))
     Category.objects.bulk_create(categories)
     return Category.objects.all()
 
