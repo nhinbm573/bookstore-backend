@@ -12,7 +12,6 @@ class AccountFactory(DjangoModelFactory):
         skip_postgeneration_save = True
 
     class Params:
-        # Traits for common scenarios
         admin = factory.Trait(is_active=True, is_admin=True)
         active = factory.Trait(is_active=True)
         inactive = factory.Trait(is_active=False, is_admin=False)
@@ -26,12 +25,12 @@ class AccountFactory(DjangoModelFactory):
     date_joined = factory.Faker("date_time_this_year")
 
     @factory.post_generation
-    def password(obj, create, extracted, **kwargs):
+    def password(self: Account, create, extracted, **kwargs):
         if not create:
             return
         password = extracted or "defaultpassword123"
-        obj.set_password(password)
-        obj.save(update_fields=["password"])
+        self.set_password(password)
+        self.save()
 
 
 def create_batch_accounts(size=5, **kwargs):
@@ -45,19 +44,19 @@ def create_test_accounts_set():
         "regular_user": AccountFactory(
             email="regular@example.com",
             full_name="Regular User",
-            active=True,  # Using trait
+            active=True,
             password="testpass123",
         ),
         "admin_user": AccountFactory(
             email="admin@example.com",
             full_name="Admin User",
-            admin=True,  # Using trait
+            admin=True,
             password="adminpass123",
         ),
         "inactive_user": AccountFactory(
             email="inactive@example.com",
             full_name="Inactive User",
-            inactive=True,  # Using trait
+            inactive=True,
             password="inactivepass123",
         ),
         "new_user": AccountFactory(

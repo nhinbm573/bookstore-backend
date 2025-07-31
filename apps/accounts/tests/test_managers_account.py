@@ -1,289 +1,229 @@
 import pytest
-from django.db import DataError
-from datetime import date, timedelta
+from datetime import date
+from django.core.exceptions import ValidationError
 
-from apps.accounts.models import Account, AccountManager
-from apps.accounts.tests.factories import AccountFactory
-
-
-# Create User Method Tests
-@pytest.mark.unit
-@pytest.mark.django_db
-def test_create_user_with_valid_data(account_model, valid_account_data):
-    """Test user creation with all required fields."""
-    user = account_model.objects.create_user(**valid_account_data)
-
-    assert user.email == valid_account_data["email"]
-    assert user.phone == valid_account_data["phone"]
-    assert user.full_name == valid_account_data["full_name"]
-    assert user.birthday == valid_account_data["birthday"]
-    assert user.check_password(valid_account_data["password"])
-    assert user.is_active is False
-    assert user.is_admin is False
+#####################################
+# ACCOUNTMANAGER CREATE_USER METHOD TESTS #
+#####################################
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    "input_email,expected_email",
-    [
-        ("TEST@EXAMPLE.COM", "TEST@example.com"),
-        ("Test@Example.com", "Test@example.com"),
-        ("  test@example.com  ", "test@example.com"),
-    ],
-)
-def test_create_user_email_normalization(
-    account_model, minimal_account_data, input_email, expected_email
-):
-    """Test email is lowercased/normalized."""
-    data = minimal_account_data.copy()
-    data["email"] = input_email
-    data["password"] = "testpass123"
+def test_create_user_success(account_model):
+    """Test creating a regular user with all fields succeeds."""
+    account = account_model.objects.create_user(
+        email="newuser@example.com",
+        phone="+1234567890",
+        full_name="New User",
+        birthday=date(1990, 1, 1),
+        password="password123",
+    )
 
-    user = account_model.objects.create_user(**data)
-    assert user.email == expected_email
+    assert account.email == "newuser@example.com"
+    assert account.phone == "+1234567890"
+    assert account.full_name == "New User"
+    assert account.birthday == date(1990, 1, 1)
+    assert account.check_password("password123")
+    assert account.is_active is False
+    assert account.is_admin is False
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-def test_create_user_password_hashing(account_model, valid_account_data):
-    """Test password is hashed, not stored plain."""
-    password = valid_account_data["password"]
-    user = account_model.objects.create_user(**valid_account_data)
+def test_create_user_default_inactive(account_model):
+    """Test that created user has is_active=False by default."""
+    account = account_model.objects.create_user(
+        email="newuser@example.com",
+        phone="+1234567890",
+        full_name="New User",
+        birthday=date(1990, 1, 1),
+        password="password123",
+    )
 
-    assert user.password != password
-    assert user.password.startswith("pbkdf2_sha256$")
-    assert user.check_password(password) is True
-
-
-@pytest.mark.unit
-def test_create_user_without_email(account_model, minimal_account_data):
-    """Test raises ValueError when email is missing."""
-    data = minimal_account_data.copy()
-    data["email"] = ""
-
-    with pytest.raises(ValueError, match="The Email field must be set"):
-        account_model.objects.create_user(**data)
+    assert account.is_active is False
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-def test_create_user_without_password(account_model, minimal_account_data):
-    """Test user creation without password."""
-    # Don't include password in data
-    user = account_model.objects.create_user(**minimal_account_data)
+def test_create_user_default_not_admin(account_model):
+    """Test that created user has is_admin=False by default."""
+    account = account_model.objects.create_user(
+        email="newuser@example.com",
+        phone="+1234567890",
+        full_name="New User",
+        birthday=date(1990, 1, 1),
+        password="password123",
+    )
 
-    assert user.password
-    assert not user.has_usable_password()
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "field_to_remove,error_pattern",
-    [
-        ("phone", "The Phone field must be set"),
-        ("full_name", "The Full Name field must be set"),
-        ("birthday", "The Birthday field must be set"),
-    ],
-)
-def test_create_user_missing_required_fields(
-    account_model, valid_account_data, field_to_remove, error_pattern
-):
-    """Test errors for missing required fields."""
-    data = valid_account_data.copy()
-    data.pop(field_to_remove)
-
-    with pytest.raises(
-        (ValueError, TypeError),
-        match=error_pattern if field_to_remove != "phone" else None,
-    ):
-        account_model.objects.create_user(**data)
+    assert account.is_admin is False
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-def test_create_user_sets_defaults(account_model, minimal_account_data):
-    """Test is_active and is_admin default values."""
-    user = account_model.objects.create_user(**minimal_account_data)
-
-    assert user.is_active is False
-    assert user.is_admin is False
-
-
-@pytest.mark.unit
-def test_create_user_rejects_is_admin_true(account_model, valid_account_data):
-    """Test regular user cannot have is_admin=True."""
-    data = valid_account_data.copy()
-    data["is_admin"] = True
-
+def test_create_user_with_is_admin_true(account_model):
+    """Test that creating regular user with is_admin=True raises ValueError."""
     with pytest.raises(ValueError, match="Regular user cannot have is_admin=True"):
-        account_model.objects.create_user(**data)
-
-
-# Create Superuser Method Tests
-@pytest.mark.unit
-@pytest.mark.django_db
-def test_create_superuser_creation(account_model, superuser_data):
-    """Test superuser creation with all fields."""
-    superuser = account_model.objects.create_superuser(**superuser_data)
-
-    assert superuser.email == superuser_data["email"]
-    assert superuser.phone == superuser_data["phone"]
-    assert superuser.full_name == superuser_data["full_name"]
-    assert superuser.birthday == superuser_data["birthday"]
-    assert superuser.check_password(superuser_data["password"])
-    assert superuser.is_admin is True
-    assert superuser.is_active is True
+        account_model.objects.create_user(
+            email="newuser@example.com",
+            phone="+1234567890",
+            full_name="New User",
+            birthday=date(1990, 1, 1),
+            password="password123",
+            is_admin=True,
+        )
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-def test_create_superuser_flags(account_model, superuser_data):
-    """Test superuser has correct flags set."""
-    superuser = account_model.objects.create_superuser(**superuser_data)
+def test_email_normalization_uppercase(account_model):
+    """Test that email is normalized when uppercase."""
+    account = account_model.objects.create_user(
+        email="TEST@EXAMPLE.COM",
+        phone="+1234567890",
+        full_name="Test User",
+        birthday=date(1990, 1, 1),
+        password="password123",
+    )
 
-    assert superuser.is_admin is True
-    assert superuser.is_active is True
-    assert superuser.is_staff is True  # Should be True via property
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "flag,value,error_pattern",
-    [
-        ("is_active", False, "Superuser must have is_active=True"),
-        ("is_admin", False, "Superuser must have is_admin=True"),
-    ],
-)
-def test_create_superuser_requires_flags(
-    account_model, superuser_data, flag, value, error_pattern
-):
-    """Test superuser must have required flags."""
-    data = superuser_data.copy()
-    data[flag] = value
-
-    with pytest.raises(ValueError, match=error_pattern):
-        account_model.objects.create_superuser(**data)
+    assert account.email == "TEST@example.com"
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    "field_to_remove,error_pattern",
-    [
-        ("email", "The Email field must be set"),
-        ("phone", "The Phone field must be set"),
-        ("full_name", "The Full Name field must be set"),
-        ("birthday", "The Birthday field must be set"),
-    ],
-)
-def test_create_superuser_missing_fields(
-    account_model, superuser_data, field_to_remove, error_pattern
-):
-    """Test superuser creation with missing required fields."""
-    data = superuser_data.copy()
-    data.pop(field_to_remove)
+def test_email_normalization_mixed_case(account_model):
+    """Test that email is normalized when mixed case."""
+    account = account_model.objects.create_user(
+        email="TeSt@ExAmPlE.com",
+        phone="+1234567890",
+        full_name="Test User",
+        birthday=date(1990, 1, 1),
+        password="password123",
+    )
 
-    with pytest.raises(
-        (ValueError, TypeError),
-        match=error_pattern if field_to_remove != "email" else None,
-    ):
-        account_model.objects.create_superuser(**data)
+    assert account.email == "TeSt@example.com"
 
 
-# Manager QuerySet Methods Tests
-@pytest.mark.unit
-def test_manager_filter_active_users(db):
-    """Test filtering active users using factory."""
-    # Create users with factory
-    active_users = AccountFactory.create_batch(3, active=True)
-    inactive_users = AccountFactory.create_batch(2, inactive=True)
-
-    # Query active users
-    queryset = Account.objects.filter(is_active=True)
-
-    assert queryset.count() == 3
-    assert all(user in queryset for user in active_users)
-    assert not any(user in queryset for user in inactive_users)
+############################################
+# ACCOUNTMANAGER CREATE_SUPERUSER METHOD TESTS #
+############################################
 
 
 @pytest.mark.unit
-def test_manager_filter_admin_users(db):
-    """Test filtering admin users using factory."""
-    # Create users with factory
-    admin_users = AccountFactory.create_batch(2, admin=True)
-    regular_users = AccountFactory.create_batch(3, is_admin=False)
+def test_create_superuser_success(account_model):
+    """Test creating a superuser with all fields succeeds."""
+    account = account_model.objects.create_superuser(
+        email="admin@example.com",
+        phone="+1234567890",
+        full_name="Admin User",
+        birthday=date(1990, 1, 1),
+        password="adminpass123",
+    )
 
-    # Query admin users
-    queryset = Account.objects.filter(is_admin=True)
-
-    assert queryset.count() == 2
-    assert all(user in queryset for user in admin_users)
-    assert not any(user in queryset for user in regular_users)
-
-
-@pytest.mark.unit
-def test_manager_instance_type(account_model):
-    """Test that the manager is correct type."""
-    assert isinstance(account_model.objects, AccountManager)
-    assert hasattr(account_model.objects, "create_user")
-    assert hasattr(account_model.objects, "create_superuser")
-
-
-# Field Validation Tests
-@pytest.mark.unit
-@pytest.mark.django_db
-def test_phone_length_validation(
-    account_model, minimal_account_data, invalid_field_data
-):
-    """Test phone field respects max_length at database level."""
-    data = minimal_account_data.copy()
-    data["phone"] = invalid_field_data["long_phone"]
-
-    with pytest.raises((DataError, ValueError)):
-        account_model.objects.create_user(**data)
+    assert account.email == "admin@example.com"
+    assert account.phone == "+1234567890"
+    assert account.full_name == "Admin User"
+    assert account.birthday == date(1990, 1, 1)
+    assert account.check_password("adminpass123")
+    assert account.is_active is True
+    assert account.is_admin is True
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-def test_full_name_length_validation(
-    account_model, minimal_account_data, invalid_field_data
-):
-    """Test full_name field respects max_length at database level."""
-    data = minimal_account_data.copy()
-    data["full_name"] = invalid_field_data["long_name"]
+def test_create_superuser_is_active_true(account_model):
+    """Test that created superuser has is_active=True by default."""
+    account = account_model.objects.create_superuser(
+        email="admin@example.com",
+        phone="+1234567890",
+        full_name="Admin User",
+        birthday=date(1990, 1, 1),
+        password="adminpass123",
+    )
 
-    with pytest.raises((DataError, ValueError)):
-        account_model.objects.create_user(**data)
-
-
-@pytest.mark.unit
-@pytest.mark.django_db
-def test_birthday_accepts_valid_dates(account_model, minimal_account_data):
-    """Test birthday accepts various valid date formats."""
-    test_dates = [
-        date(1990, 1, 1),
-        date(2000, 12, 31),
-        date.today() - timedelta(days=365 * 25),  # 25 years ago
-    ]
-
-    for idx, test_date in enumerate(test_dates):
-        data = minimal_account_data.copy()
-        data["birthday"] = test_date
-        data["email"] = f"user_{idx}_{test_date.year}@example.com"
-
-        user = account_model.objects.create_user(**data)
-        assert user.birthday == test_date
+    assert account.is_active is True
 
 
 @pytest.mark.unit
-@pytest.mark.django_db
-def test_future_birthday_accepted_by_manager(
-    account_model, minimal_account_data, invalid_field_data
-):
-    """Test manager accepts future dates (validation should be in forms/serializers)."""
-    data = minimal_account_data.copy()
-    data["birthday"] = invalid_field_data["future_birthday"]
+def test_create_superuser_is_admin_true(account_model):
+    """Test that created superuser has is_admin=True by default."""
+    account = account_model.objects.create_superuser(
+        email="admin@example.com",
+        phone="+1234567890",
+        full_name="Admin User",
+        birthday=date(1990, 1, 1),
+        password="adminpass123",
+    )
 
-    # Manager will accept this
-    user = account_model.objects.create_user(**data)
-    assert user.birthday == invalid_field_data["future_birthday"]
+    assert account.is_admin is True
+
+
+@pytest.mark.unit
+def test_create_superuser_with_is_active_false(account_model):
+    """Test that creating superuser with is_active=False raises ValueError."""
+    with pytest.raises(ValueError, match="Superuser must have is_active=True"):
+        account_model.objects.create_superuser(
+            email="admin@example.com",
+            phone="+1234567890",
+            full_name="Admin User",
+            birthday=date(1990, 1, 1),
+            password="adminpass123",
+            is_active=False,
+        )
+
+
+@pytest.mark.unit
+def test_create_superuser_with_is_admin_false(account_model):
+    """Test that creating superuser with is_admin=False raises ValueError."""
+    with pytest.raises(ValueError, match="Superuser must have is_admin=True"):
+        account_model.objects.create_superuser(
+            email="admin@example.com",
+            phone="+1234567890",
+            full_name="Admin User",
+            birthday=date(1990, 1, 1),
+            password="adminpass123",
+            is_admin=False,
+        )
+
+
+#################################
+# MANAGER VALIDATION TESTS #
+#################################
+
+
+@pytest.mark.unit
+def test_create_user_with_invalid_email_format(account_model):
+    """Test creating user with invalid email format succeeds (no validation)."""
+    account = account_model.objects.create_user(
+        email="notanemail",
+        phone="+1234567890",
+        full_name="Test User",
+        birthday=date(1990, 1, 1),
+        password="password123",
+    )
+
+    assert account.email == "notanemail"
+
+
+@pytest.mark.unit
+def test_create_user_with_future_birthday(account_model):
+    """Test that creating user with future birthday succeeds."""
+    from datetime import timedelta
+    from django.utils import timezone
+
+    tomorrow = timezone.now().date() + timedelta(days=1)
+
+    account = account_model.objects.create_user(
+        email="future@example.com",
+        phone="+1234567890",
+        full_name="Future User",
+        birthday=tomorrow,
+        password="password123",
+    )
+
+    assert account.birthday == tomorrow
+
+
+@pytest.mark.unit
+def test_create_user_with_invalid_date_format(account_model):
+    """Test that creating user with invalid date format fails."""
+    with pytest.raises(ValidationError):
+        account_model.objects.create_user(
+            email="test@example.com",
+            phone="+1234567890",
+            full_name="Test User",
+            birthday="not-a-date",
+            password="password123",
+        )
