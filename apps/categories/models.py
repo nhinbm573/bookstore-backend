@@ -14,7 +14,7 @@ class Category(models.Model):
         return self.name
 
     def clean(self):
-        if self.name and self.name.strip() == "":
+        if self.name is not None and self.name.strip() == "":
             raise ValidationError({"name": "This field cannot be blank."})
 
     def save(self, *args, **kwargs):
