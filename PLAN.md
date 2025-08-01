@@ -13,32 +13,20 @@
 - [X] **Model tests**: Wrote unit tests covering fields, constraints, and relationships for all models
 - [X] **Migrations**: Ran initial migrations and confirmed development database setup
 
-### Day 2 - Basic API Endpoints
-- [ ] Set up Django REST Framework serializers for all models
-- [ ] Implement URL routing for API endpoints
-- [ ] Write API endpoint tests
-- [ ] Test API endpoints with Postman/curl
+### Day 2 - Browse Books Feature (Setup)
+- [X] **BookSerializer**: Implemented to serialize `Book` model data
+- [X] **BookListView**: Created a view for listing books with the following features:
+    - [X] **Search**: Added functionality to search by `author_name` or `title`
+    - [X] **Filter**: Included filtering capability by `Category` name
+    - [X] **Pagination**: Implemented pagination with a default `page` of 1 and `limit` of 10
+- [X] **Tests**: Wrote unit tests to cover the functionality of the `BookSerializer` and the `BookListView`
 
-### Day 3 - Browse Books Feature Setup
-- [ ] Implement Books list API with filtering by category
-- [ ] Add pagination support for book listings
-- [ ] Create book search functionality (by title/author)
-- [ ] Implement sorting options (price, rating, date)
-- [ ] Add book detail API endpoint
-- [ ] Write unit tests for book browsing features
-
-### Day 4 - Browse Books Integration Test
-- [ ] Create end-to-end test for complete browse books workflow
-- [ ] Test category filtering functionality
-- [ ] Test search and sorting features
-- [ ] Verify pagination works correctly
-- [ ] Test API response formats and error handling
-- [ ] Document API endpoints
-
-### Day 5 - Testing & Documentation
-- [ ] Run full test suite and achieve >90% coverage
-- [ ] Fix any failing tests or bugs found
-- [ ] Code review and refactoring if needed
+### Day 3 - Browse Books Feature (Integration Test)
+- [X] **Integration tests**: Wrote tests for the book list features:
+    - [X] Integration test for book list
+    - [X] Integration test for searching by title or author_name
+    - [X] Integration test for filtering by category
+    - [X] Integration test for pagination on the book list
 
 ## Week 2: Advanced Features & User Management
 
