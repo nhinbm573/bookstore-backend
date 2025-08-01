@@ -3,19 +3,19 @@
 ## Week 1: Foundation & Core Features
 
 ### Day 1 - Database Schema Setup
-- [X] Implement User model (custom AbstractUser with UUID, email login)
-- [X] Create Category model with sort_order
-- [ ] Implement Book model with pricing, ratings, and M2M categories
-- [ ] Create supporting models (Comment, Order, OrderLine, ShoppingCart, ShoppingCartItem)
-- [ ] Write comprehensive model tests for all entities
-- [ ] Configure Django admin interface
-- [ ] Run migrations and verify database setup
+- [X] **Account model**: Implemented custom `Account` model based on `AbstractBaseUser` with UUID and email login
+- [X] **Account manager**: Implemented custom `AccountManager` for handling user creation logic
+- [X] **Category model**: Created with name and `sort_order` fields
+- [X] **Book model**: Implemented with pricing, ratings, and many-to-many relationship with `Category`
+- [X] **Comment model**: Created with foreign keys to `Account` and `Book`, and content field
+- [X] **Factories**: Added model factories for `Account`, `Category`, `Book`, and `Comment`
+- [X] **Fixtures**: Configured `conftest.py` with reusable fixtures for all models
+- [X] **Model tests**: Wrote unit tests covering fields, constraints, and relationships for all models
+- [X] **Migrations**: Ran initial migrations and confirmed development database setup
 
 ### Day 2 - Basic API Endpoints
 - [ ] Set up Django REST Framework serializers for all models
-- [ ] Create ViewSets for CRUD operations (User, Book, Category)
 - [ ] Implement URL routing for API endpoints
-- [ ] Add basic authentication and permissions
 - [ ] Write API endpoint tests
 - [ ] Test API endpoints with Postman/curl
 
@@ -38,8 +38,6 @@
 ### Day 5 - Testing & Documentation
 - [ ] Run full test suite and achieve >90% coverage
 - [ ] Fix any failing tests or bugs found
-- [ ] Create API documentation (OpenAPI/Swagger)
-- [ ] Set up development environment documentation
 - [ ] Code review and refactoring if needed
 
 ## Week 2: Advanced Features & User Management
