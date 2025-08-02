@@ -21,3 +21,7 @@ DATABASES = {
         "PORT": config("DB_PORT", default="5432"),
     }
 }
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
