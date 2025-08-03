@@ -1,16 +1,28 @@
-class BookSerializer:
-    @staticmethod
-    def serialize(book):
-        return {
-            "id": book.id,
-            "title": book.title,
-            "authorName": book.author_name,
-            "unitPrice": float(book.unit_price) if book.unit_price else 0,
-            "photoPath": book.photo_path if hasattr(book, "photo_path") else None,
-            "totalRatingValue": (
-                book.total_rating_value if hasattr(book, "total_rating_value") else 0
-            ),
-            "totalRatingCount": (
-                book.total_rating_count if hasattr(book, "total_rating_count") else 0
-            ),
-        }
+from rest_framework import serializers
+from .models import Book
+
+
+class BookSerializer(serializers.ModelSerializer):
+    authorName = serializers.CharField(source="author_name", read_only=True)
+    unitPrice = serializers.DecimalField(
+        source="unit_price", max_digits=10, decimal_places=2, default=0, read_only=True
+    )
+    photoPath = serializers.CharField(source="photo_path", read_only=True)
+    totalRatingValue = serializers.IntegerField(
+        source="total_rating_value", default=0, read_only=True
+    )
+    totalRatingCount = serializers.IntegerField(
+        source="total_rating_count", default=0, read_only=True
+    )
+
+    class Meta:
+        model = Book
+        fields = [
+            "id",
+            "title",
+            "authorName",
+            "unitPrice",
+            "photoPath",
+            "totalRatingValue",
+            "totalRatingCount",
+        ]

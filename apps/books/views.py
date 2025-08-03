@@ -1,66 +1,48 @@
-from django.db.models import Q
-from django.core.paginator import Paginator
-from django.http import JsonResponse
-from django.views import View
+from rest_framework import generics, filters
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+import django_filters
 from .models import Book
 from .serializers import BookSerializer
 
 
-class BookListView(View):
-    def get(self, request):
-        try:
-            # QUERY PARAMETERS
-            page = int(request.GET.get("page", 1))
-            limit = int(request.GET.get("limit", 10))
-            category_name = request.GET.get("category", None)
-            search_term = request.GET.get("search", None)
+class BookPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "limit"
+    max_page_size = 100
 
-            # GET ALL BOOKS
-            queryset = Book.objects.all()
-
-            # FEATURE: FILTER BY CATEGORY
-            if category_name:
-                queryset = queryset.filter(category__name__iexact=category_name)
-
-            # FEATURE: SEARCH BY TITLE OR AUTHER_NAME
-            if search_term:
-                queryset = queryset.filter(
-                    Q(author_name__icontains=search_term)
-                    | Q(title__icontains=search_term)
-                )
-
-            # FEATURE: PAGINATION
-            paginator = Paginator(queryset, limit)
-            page_obj = paginator.get_page(page)
-
-            books_data = [BookSerializer.serialize(book) for book in page_obj]
-            response_data = {
-                "data": books_data,
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                "data": data,
                 "pagination": {
-                    "totalPages": paginator.num_pages,
-                    "totalItems": paginator.count,
-                    "currentPage": page,
-                    "limit": limit,
-                    "hasNext": page_obj.has_next(),
-                    "hasPrevious": page_obj.has_previous(),
+                    "totalPages": self.page.paginator.num_pages,
+                    "totalItems": self.page.paginator.count,
+                    "currentPage": self.page.number,
+                    "limit": self.get_page_size(self.request),
+                    "hasNext": self.page.has_next(),
+                    "hasPrevious": self.page.has_previous(),
                 },
                 "status": 200,
             }
-            return JsonResponse(response_data, safe=False)
+        )
 
-        except ValueError:
-            return JsonResponse(
-                {
-                    "data": [],
-                    "pagination": None,
-                    "status": 400,
-                    "error": "Invalid page or limit parameter",
-                },
-                status=400,
-            )
 
-        except Exception as e:
-            return JsonResponse(
-                {"data": [], "pagination": None, "status": 500, "error": str(e)},
-                status=500,
-            )
+class BookFilter(django_filters.FilterSet):
+    category = django_filters.CharFilter(
+        field_name="category__name", lookup_expr="iexact"
+    )
+
+    class Meta:
+        model = Book
+        fields = ["category"]
+
+
+class BookListView(generics.ListAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    pagination_class = BookPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_class = BookFilter
+    search_fields = ["author_name", "title"]
