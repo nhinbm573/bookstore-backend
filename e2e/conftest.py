@@ -60,12 +60,15 @@ def setup_test_data(django_db_blocker):
                     content=f"Great book! - {user.full_name}",
                 )
 
-        # Force commit to ensure data is visible to the Django server process
+        from django.db import transaction
+
+        transaction.commit()
         connection.close()
 
         from apps.books.models import Book
 
         print(f"Created {Book.objects.count()} books in database")
+        print(f"Database name: {connection.settings_dict['NAME']}")
 
     yield {"categories": categories, "users": users, "books": books}
 
