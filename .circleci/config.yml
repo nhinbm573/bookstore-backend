@@ -155,14 +155,6 @@ jobs:
             echo "Postgres is up!"
 
 
-      # SETUP PLAYWRIGHT
-      - run:
-          name: "Install Playwright"
-          command: |
-            source venv/bin/activate
-            playwright install
-
-
       # RUN SERVICES
       - run:
           name: "Run Frontend Dev Server (background)"
@@ -179,7 +171,7 @@ jobs:
 
       # TEST
       - run:
-          name: "Run Playwright E2E Tests"
+          name: "Run E2E Tests"
           command: |
             source venv/bin/activate
             pytest -m e2e
