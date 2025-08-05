@@ -130,27 +130,6 @@ def django_server(setup_test_data, django_db_blocker):
 
     print("Starting Django development server...")
 
-    check_data_cmd = """python -c "
-import os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.testing')
-import django
-django.setup()
-from apps.books.models import Book
-from apps.categories.models import Category
-print(f'Subprocess sees - Books: {Book.objects.count()}, Categories: {Category.objects.count()}')
-"
-"""
-    check_result = subprocess.run(
-        check_data_cmd,
-        shell=True,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
-    )
-    print(f"Subprocess check output: {check_result.stdout}")
-    if check_result.stderr:
-        print(f"Subprocess check errors: {check_result.stderr}")
-
     server_process = subprocess.Popen(
         ["python", "manage.py", "runserver"],
         stdout=subprocess.PIPE,
@@ -169,6 +148,13 @@ print(f'Subprocess sees - Books: {Book.objects.count()}, Categories: {Category.o
             response = requests.get(f"{server_url}/api/", timeout=1)
             if response.status_code in [200, 404]:  # Server is responding
                 print(f"Django server is ready at {server_url}")
+
+                # Check if books API is working
+                books_response = requests.get(f"{server_url}/api/books/", timeout=1)
+                print(f"Books API status: {books_response.status_code}")
+                if books_response.status_code == 200:
+                    print(f"Books API returned {len(books_response.json())} books")
+
                 break
         except (requests.ConnectionError, requests.Timeout):
             if i == max_attempts - 1:
