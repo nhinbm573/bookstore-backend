@@ -21,45 +21,47 @@ django.setup()
 @pytest.fixture(scope="function")
 def setup_test_data(django_db_blocker):
     with django_db_blocker.unblock():
-        from django.db import transaction
+        from django.db import connection
 
-        with transaction.atomic():
-            categories = [
-                CategoryFactory.create(name="Fiction"),
-                CategoryFactory.create(name="Non-Fiction"),
-                CategoryFactory.create(name="Science"),
-            ]
+        categories = [
+            CategoryFactory.create(name="Fiction"),
+            CategoryFactory.create(name="Non-Fiction"),
+            CategoryFactory.create(name="Science"),
+        ]
 
-            users = [
-                AccountFactory.create(
-                    email="test1@example.com",
-                    full_name="Test User 1",
-                    active=True,
-                    password="testpass123",
-                ),
-                AccountFactory.create(
-                    email="test2@example.com",
-                    full_name="Test User 2",
-                    active=True,
-                    password="testpass123",
-                ),
-            ]
+        users = [
+            AccountFactory.create(
+                email="test1@example.com",
+                full_name="Test User 1",
+                active=True,
+                password="testpass123",
+            ),
+            AccountFactory.create(
+                email="test2@example.com",
+                full_name="Test User 2",
+                active=True,
+                password="testpass123",
+            ),
+        ]
 
-            books = []
-            for i in range(10):
-                book = BookFactory.create(
-                    title=f"Test Book {i + 1}", category=categories[i % len(categories)]
+        books = []
+        for i in range(10):
+            book = BookFactory.create(
+                title=f"Test Book {i + 1}", category=categories[i % len(categories)]
+            )
+            books.append(book)
+
+        for book in books[:5]:
+            for user in users:
+                CommentFactory.create(
+                    book=book,
+                    account=user,
+                    rating=4,
+                    content=f"Great book! - {user.full_name}",
                 )
-                books.append(book)
 
-            for book in books[:5]:
-                for user in users:
-                    CommentFactory.create(
-                        book=book,
-                        account=user,
-                        rating=4,
-                        content=f"Great book! - {user.full_name}",
-                    )
+        # Force commit to ensure data is visible to the Django server process
+        connection.close()
 
         from apps.books.models import Book
 
