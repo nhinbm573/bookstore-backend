@@ -87,7 +87,7 @@ def setup_test_data(django_db_blocker):
 
 
 @pytest.fixture(scope="function")
-def django_server():
+def django_server(setup_test_data):
     """Start Django development server for the entire test session."""
     import requests
 
