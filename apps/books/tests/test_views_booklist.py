@@ -1,6 +1,6 @@
 import pytest
 import json
-from django.test import RequestFactory
+from rest_framework.test import APIRequestFactory
 from django.test.utils import override_settings
 from apps.books.views import BookListView
 from apps.books.models import Book
@@ -9,11 +9,12 @@ from apps.books.models import Book
 @pytest.mark.unit
 def test_get_empty_book_list(db):
     """Returns empty list when no books exist"""
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     if response.status_code == 500:
@@ -31,11 +32,12 @@ def test_get_book_list_default_pagination(book_factory, category_factory):
     category = category_factory()
     [book_factory.create(category=category) for _ in range(15)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -51,11 +53,12 @@ def test_get_book_list_with_multiple_books(book_factory, category_factory):
     category = category_factory()
     [book_factory.create(title=f"Book {i}", category=category) for i in range(15)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -72,11 +75,12 @@ def test_custom_page_and_limit(book_factory, category_factory):
     category = category_factory()
     [book_factory.create(category=category) for _ in range(20)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?page=2&limit=5")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -89,33 +93,36 @@ def test_custom_page_and_limit(book_factory, category_factory):
 @pytest.mark.unit
 def test_invalid_page_parameter(db):
     """Handles non-integer page gracefully"""
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?page=abc")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
+    print(data)
 
     assert response.status_code == 400
     assert data["status"] == 400
-    assert data["error"] == "Invalid page or limit parameter"
+    assert data["error"] == "Invalid page parameter. Page must be an integer."
     assert data["data"] == []
     assert data["pagination"] is None
 
 
 @pytest.mark.unit
-def test_invalid_limit_parameter():
+def test_invalid_limit_parameter(db):
     """Handles non-integer limit gracefully"""
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?limit=xyz")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 400
     assert data["status"] == 400
-    assert data["error"] == "Invalid page or limit parameter"
+    assert data["error"] == "Invalid limit parameter. Limit must be an integer."
 
 
 @pytest.mark.unit
@@ -123,16 +130,18 @@ def test_negative_page_number(book_factory):
     """Handles negative page numbers"""
     book_factory.create()
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?page=-1")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
-    assert response.status_code == 200
-    assert data["pagination"]["currentPage"] == -1
-    assert len(data["data"]) >= 0
+    assert response.status_code == 400
+    assert data["error"] == "Invalid page parameter. Page must be a positive integer."
+    assert data["data"] == []
+    assert data["pagination"] is None
 
 
 @pytest.mark.unit
@@ -141,15 +150,18 @@ def test_page_exceeds_total_pages(book_factory, category_factory):
     category = category_factory()
     [book_factory.create(category=category) for _ in range(5)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?page=999&limit=10")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
-    assert response.status_code == 200
-    assert len(data["data"]) == 5
+    assert response.status_code == 404
+    assert data["error"] == "The requested page does not exist."
+    assert data["data"] == []
+    assert data["pagination"] is None
 
 
 @pytest.mark.unit
@@ -158,15 +170,19 @@ def test_zero_or_negative_limit(book_factory, category_factory):
     category = category_factory()
     book_factory.create(category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?limit=0")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
-    assert response.status_code == 500
-    assert data["status"] == 500
+    assert response.status_code == 400
+    assert data["status"] == 400
+    assert data["error"] == "Invalid limit parameter. Limit must be a positive integer."
+    assert data["data"] == []
+    assert data["pagination"] is None
 
 
 @pytest.mark.unit
@@ -178,11 +194,12 @@ def test_filter_by_category_name(book_factory, category_factory):
     [book_factory.create(category=fiction) for _ in range(3)]
     [book_factory.create(category=science) for _ in range(2)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?category=Fiction")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -196,14 +213,16 @@ def test_filter_by_category_case_insensitive(book_factory, category_factory):
     fiction = category_factory.create(name="Fiction")
     [book_factory.create(category=fiction) for _ in range(3)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
 
     request1 = factory.get("/books/?category=fiction")
-    response1 = BookListView().get(request1)
+    response1 = BookListView.as_view()(request1)
+    response1.render()
     data1 = json.loads(response1.content)
 
     request2 = factory.get("/books/?category=FICTION")
-    response2 = BookListView().get(request2)
+    response2 = BookListView.as_view()(request2)
+    response2.render()
     data2 = json.loads(response2.content)
 
     assert len(data1["data"]) == len(data2["data"]) == 3
@@ -213,11 +232,12 @@ def test_filter_by_category_case_insensitive(book_factory, category_factory):
 @pytest.mark.unit
 def test_filter_by_nonexistent_category(db):
     """Handles filtering by non-existent category"""
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?category=InvalidCategory")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -234,11 +254,12 @@ def test_search_by_author_name(book_factory, category_factory):
     book_factory.create(author_name="Jane Smith", category=category)
     book_factory.create(author_name="Bob Johnson", category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?search=Smith")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -255,11 +276,12 @@ def test_search_by_title(book_factory, category_factory):
     book_factory.create(title="Learning Python", category=category)
     book_factory.create(title="Java Basics", category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?search=Python")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -275,13 +297,19 @@ def test_search_case_insensitive(book_factory, category_factory):
     book_factory.create(title="Python Programming", category=category)
     book_factory.create(author_name="Python Expert", category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
 
     request1 = factory.get("/books/?search=python")
-    data1 = json.loads(BookListView().get(request1).content)
+    view1 = BookListView.as_view()
+    response1 = view1(request1)
+    response1.render()
+    data1 = json.loads(response1.content)
 
     request2 = factory.get("/books/?search=PYTHON")
-    data2 = json.loads(BookListView().get(request2).content)
+    view2 = BookListView.as_view()
+    response2 = view2(request2)
+    response2.render()
+    data2 = json.loads(response2.content)
 
     assert len(data1["data"]) == len(data2["data"]) == 2
 
@@ -294,11 +322,12 @@ def test_search_partial_match(book_factory, category_factory):
     book_factory.create(title="Python Programming", category=category)
     book_factory.create(title="Complete Python Guide", category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?search=Pyth")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -318,11 +347,12 @@ def test_search_matches_either_field(book_factory, category_factory):
         title="Ruby Rails", author_name="Other Author", category=category
     )
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?search=Django")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -336,11 +366,12 @@ def test_category_filter_with_pagination(book_factory, category_factory):
 
     [book_factory.create(category=fiction) for _ in range(12)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?category=Fiction&page=2&limit=5")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -358,11 +389,12 @@ def test_search_with_pagination(book_factory, category_factory):
     for i in range(15):
         book_factory.create(title=f"Python Book {i}", category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?search=Python&page=2&limit=10")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -381,11 +413,12 @@ def test_category_and_search_together(book_factory, category_factory):
     book_factory.create(title="Java Fiction", category=fiction, author_name="Smith")
     book_factory.create(title="Python Science", category=science, author_name="Smith")
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?category=Fiction&search=Smith")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200
@@ -395,11 +428,12 @@ def test_category_and_search_together(book_factory, category_factory):
 @pytest.mark.unit
 def test_response_structure(db):
     """Verifies correct JSON structure"""
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert "data" in data
@@ -416,11 +450,12 @@ def test_pagination_metadata_complete(book_factory, category_factory):
     category = category_factory()
     book_factory.create(category=category)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     pagination = data["pagination"]
@@ -437,11 +472,12 @@ def test_book_fields_camel_case(book_factory):
     """Book fields use camelCase"""
     book_factory.create(title="Test Book", author_name="Test Author", unit_price=29.99)
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     book_data = data["data"][0]
@@ -454,16 +490,18 @@ def test_book_fields_camel_case(book_factory):
 @pytest.mark.unit
 def test_http_status_matches_response_status(db):
     """HTTP status matches response status field"""
-    factory = RequestFactory()
+    factory = APIRequestFactory()
 
     request1 = factory.get("/books/")
-    response1 = BookListView().get(request1)
+    response1 = BookListView.as_view()(request1)
+    response1.render()
     data1 = json.loads(response1.content)
     assert response1.status_code == 200
     assert data1["status"] == 200
 
     request2 = factory.get("/books/?page=invalid")
-    response2 = BookListView().get(request2)
+    response2 = BookListView.as_view()(request2)
+    response2.render()
     data2 = json.loads(response2.content)
     assert response2.status_code == 400
     assert data2["status"] == 400
@@ -478,12 +516,13 @@ def test_no_n_plus_one_queries(
     category = category_factory.create()
     [book_factory.create(category=category) for _ in range(10)]
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/")
-    view = BookListView()
+    view = BookListView.as_view()
 
     with django_assert_num_queries(2):
-        response = view.get(request)
+        response = view(request)
+        response.render()
         data = json.loads(response.content)
         _ = data["data"]
 
@@ -507,11 +546,12 @@ def test_large_dataset_pagination(book_factory, category_factory):
         ]
     )
 
-    factory = RequestFactory()
+    factory = APIRequestFactory()
     request = factory.get("/books/?page=5&limit=20")
-    view = BookListView()
+    view = BookListView.as_view()
 
-    response = view.get(request)
+    response = view(request)
+    response.render()
     data = json.loads(response.content)
 
     assert response.status_code == 200

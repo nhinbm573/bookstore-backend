@@ -342,11 +342,14 @@ def test_book_cascade_delete(comment_factory, book_factory):
 
 
 @pytest.mark.unit
-def test_account_comments_reverse_relation(comment_factory, account_factory):
+def test_account_comments_reverse_relation(
+    comment_factory, account_factory, category_factory
+):
     """Test accessing comments through account's reverse relation."""
     account = account_factory.create()
-    comment1 = comment_factory.create(account=account)
-    comment2 = comment_factory.create(account=account)
+    category = category_factory()
+    comment1 = comment_factory.create(account=account, book__category=category)
+    comment2 = comment_factory.create(account=account, book__category=category)
 
     comments = list(account.comments.all())
     assert len(comments) == 2
@@ -514,26 +517,20 @@ def test_default_ordering_newest_first(comment_factory, category_factory):
 
 
 @pytest.mark.unit
-def test_ordering_comment_date_descending(comment_factory):
+def test_ordering_comment_date_descending(comment_factory, category_factory):
     """Test that older comments appear last."""
     import time
 
-    # Create comments with a time gap between them
-    old_comment = comment_factory.create()
+    category = category_factory()
 
-    # Small delay to ensure different timestamps
+    old_comment = comment_factory.create(book__category=category)
     time.sleep(0.1)
 
-    new_comment = comment_factory.create()
-
-    # Query all comments (should be ordered by -comment_date)
+    new_comment = comment_factory.create(book__category=category)
     comments = list(comment_factory._meta.model.objects.all())
 
-    # Newer comment should appear first
     assert comments[0].id == new_comment.id
     assert comments[1].id == old_comment.id
-
-    # Verify the dates are actually different
     assert new_comment.comment_date > old_comment.comment_date
 
 

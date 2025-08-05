@@ -1,6 +1,7 @@
 from rest_framework import generics, filters
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from .models import Book
@@ -46,3 +47,76 @@ class BookListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = BookFilter
     search_fields = ["author_name", "title"]
+
+    def _validate_pagination_params(self, request):
+        page = request.query_params.get("page")
+        limit = request.query_params.get("limit")
+
+        if page is not None:
+            try:
+                page_num = int(page)
+                if page_num < 1:
+                    return Response(
+                        {
+                            "data": [],
+                            "pagination": None,
+                            "status": 400,
+                            "error": "Invalid page parameter. Page must be a positive integer.",
+                        },
+                        status=400,
+                    )
+            except ValueError:
+                return Response(
+                    {
+                        "data": [],
+                        "pagination": None,
+                        "status": 400,
+                        "error": "Invalid page parameter. Page must be an integer.",
+                    },
+                    status=400,
+                )
+
+        if limit is not None:
+            try:
+                limit_num = int(limit)
+                if limit_num <= 0:
+                    return Response(
+                        {
+                            "data": [],
+                            "pagination": None,
+                            "status": 400,
+                            "error": "Invalid limit parameter. Limit must be a positive integer.",
+                        },
+                        status=400,
+                    )
+            except ValueError:
+                return Response(
+                    {
+                        "data": [],
+                        "pagination": None,
+                        "status": 400,
+                        "error": "Invalid limit parameter. Limit must be an integer.",
+                    },
+                    status=400,
+                )
+        return None
+
+    def list(self, request, *args, **kwargs):
+        validation_response = self._validate_pagination_params(request)
+        if validation_response:
+            return validation_response
+
+        try:
+            return super().list(request, *args, **kwargs)
+        except NotFound as e:
+            if "Invalid page" in str(e):
+                return Response(
+                    {
+                        "data": [],
+                        "pagination": None,
+                        "status": 404,
+                        "error": "The requested page does not exist.",
+                    },
+                    status=404,
+                )
+            raise
