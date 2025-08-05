@@ -178,6 +178,12 @@ jobs:
             source venv/bin/activate
             pytest -m e2e -n 1
 
+      - store_artifacts:
+          name: "Store debug screenshots on failure"
+          path: debug_screenshot.png
+          when: on_fail
+
+
 
 workflows:
   build_and_test_workflow:
