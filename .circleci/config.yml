@@ -174,7 +174,7 @@ jobs:
           name: "Run E2E Tests"
           command: |
             source venv/bin/activate
-            pytest -m e2e
+            pytest -m e2e -n 1
 
 
 workflows:
