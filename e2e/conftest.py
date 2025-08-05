@@ -91,6 +91,18 @@ def django_server():
     """Start Django development server for the entire test session."""
     import requests
 
+    print("Running migrations...")
+    migrate_result = subprocess.run(
+        ["python", "manage.py", "migrate"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
+    )
+
+    if migrate_result.returncode != 0:
+        print(f"Migration output: {migrate_result.stdout}")
+        print(f"Migration errors: {migrate_result.stderr}")
+
     print("Starting Django development server...")
     server_process = subprocess.Popen(
         ["python", "manage.py", "runserver"],
