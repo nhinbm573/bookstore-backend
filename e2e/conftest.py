@@ -110,7 +110,6 @@ def django_server(setup_test_data, django_db_blocker):
     """Start Django development server for the entire test session."""
     import requests
 
-    # Verify data exists before starting server
     with django_db_blocker.unblock():
         from apps.books.models import Book
         from apps.categories.models import Category
@@ -148,13 +147,6 @@ def django_server(setup_test_data, django_db_blocker):
             response = requests.get(f"{server_url}/api/", timeout=1)
             if response.status_code in [200, 404]:  # Server is responding
                 print(f"Django server is ready at {server_url}")
-
-                # Check if books API is working
-                books_response = requests.get(f"{server_url}/api/books/", timeout=1)
-                print(f"Books API status: {books_response.status_code}")
-                if books_response.status_code == 200:
-                    print(f"Books API returned {len(books_response.json())} books")
-
                 break
         except (requests.ConnectionError, requests.Timeout):
             if i == max_attempts - 1:

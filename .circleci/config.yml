@@ -161,6 +161,8 @@ jobs:
           working_directory: frontend
           command: npm run dev > ../frontend-dev-server.log 2>&1
           background: true
+          environment:
+            VITE_API_URL: "http://127.0.0.1:8000/api/"
       - run:
           name: "Wait for Frontend Service"
           command: |
