@@ -19,7 +19,26 @@ django.setup()
 
 
 @pytest.fixture(scope="function")
-def setup_test_data(django_db_blocker):
+def run_migrations():
+    """Run migrations before setting up test data."""
+    print("Running migrations...")
+    migrate_result = subprocess.run(
+        ["python", "manage.py", "migrate"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
+    )
+
+    if migrate_result.returncode != 0:
+        print(f"Migration output: {migrate_result.stdout}")
+        print(f"Migration errors: {migrate_result.stderr}")
+        raise RuntimeError("Failed to run migrations")
+
+    yield
+
+
+@pytest.fixture(scope="function")
+def setup_test_data(django_db_blocker, run_migrations):
     with django_db_blocker.unblock():
         from django.db import connection
 
@@ -90,18 +109,6 @@ def setup_test_data(django_db_blocker):
 def django_server(setup_test_data):
     """Start Django development server for the entire test session."""
     import requests
-
-    print("Running migrations...")
-    migrate_result = subprocess.run(
-        ["python", "manage.py", "migrate"],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
-    )
-
-    if migrate_result.returncode != 0:
-        print(f"Migration output: {migrate_result.stdout}")
-        print(f"Migration errors: {migrate_result.stderr}")
 
     print("Starting Django development server...")
     server_process = subprocess.Popen(
