@@ -106,11 +106,51 @@ def setup_test_data(django_db_blocker, run_migrations):
 
 
 @pytest.fixture(scope="function")
-def django_server(setup_test_data):
+def django_server(setup_test_data, django_db_blocker):
     """Start Django development server for the entire test session."""
     import requests
 
+    # Verify data exists before starting server
+    with django_db_blocker.unblock():
+        from apps.books.models import Book
+        from apps.categories.models import Category
+        from apps.accounts.models import Account
+
+        book_count = Book.objects.count()
+        category_count = Category.objects.count()
+        account_count = Account.objects.count()
+
+        print(
+            f"Before starting server - "
+            f"Books: {book_count}, Categories: {category_count}, Accounts: {account_count}"
+        )
+
+        if book_count == 0:
+            raise RuntimeError("No books found in database before starting server!")
+
     print("Starting Django development server...")
+
+    check_data_cmd = """python -c "
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.testing')
+import django
+django.setup()
+from apps.books.models import Book
+from apps.categories.models import Category
+print(f'Subprocess sees - Books: {Book.objects.count()}, Categories: {Category.objects.count()}')
+"
+"""
+    check_result = subprocess.run(
+        check_data_cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
+    )
+    print(f"Subprocess check output: {check_result.stdout}")
+    if check_result.stderr:
+        print(f"Subprocess check errors: {check_result.stderr}")
+
     server_process = subprocess.Popen(
         ["python", "manage.py", "runserver"],
         stdout=subprocess.PIPE,
@@ -118,7 +158,7 @@ def django_server(setup_test_data):
         env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
     )
 
-    server_url = "http://localhost:8000"
+    server_url = "http://127.0.0.1:8000"
     max_attempts = 30
     for i in range(max_attempts):
         try:
