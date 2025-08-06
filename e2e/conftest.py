@@ -19,26 +19,7 @@ django.setup()
 
 
 @pytest.fixture(scope="function")
-def run_migrations():
-    """Run migrations before setting up test data."""
-    print("Running migrations...")
-    migrate_result = subprocess.run(
-        ["python", "manage.py", "migrate"],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
-    )
-
-    if migrate_result.returncode != 0:
-        print(f"Migration output: {migrate_result.stdout}")
-        print(f"Migration errors: {migrate_result.stderr}")
-        raise RuntimeError("Failed to run migrations")
-
-    yield
-
-
-@pytest.fixture(scope="function")
-def setup_test_data(django_db_blocker, run_migrations):
+def setup_test_data(django_db_blocker):
     with django_db_blocker.unblock():
         from django.db import connection
 
@@ -79,15 +60,12 @@ def setup_test_data(django_db_blocker, run_migrations):
                     content=f"Great book! - {user.full_name}",
                 )
 
-        from django.db import transaction
-
-        transaction.commit()
+        # Force commit to ensure data is visible to the Django server process
         connection.close()
 
         from apps.books.models import Book
 
         print(f"Created {Book.objects.count()} books in database")
-        print(f"Database name: {connection.settings_dict['NAME']}")
 
     yield {"categories": categories, "users": users, "books": books}
 
@@ -106,37 +84,63 @@ def setup_test_data(django_db_blocker, run_migrations):
 
 
 @pytest.fixture(scope="function")
-def django_server(setup_test_data, django_db_blocker):
+def django_server():
     """Start Django development server for the entire test session."""
     import requests
+    import psycopg2
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+    from decouple import config
 
-    with django_db_blocker.unblock():
-        from apps.books.models import Book
-        from apps.categories.models import Category
-        from apps.accounts.models import Account
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        book_count = Book.objects.count()
-        category_count = Category.objects.count()
-        account_count = Account.objects.count()
+    db_name = config("TEST_DB_NAME", default="test_db")
+    db_user = config("TEST_DB_USER", default="test_user")
+    db_password = config("TEST_DB_PASSWORD", default="test_password")
+    db_host = config("TEST_DB_HOST", default="localhost")
 
-        print(
-            f"Before starting server - "
-            f"Books: {book_count}, Categories: {category_count}, Accounts: {account_count}"
+    try:
+        conn = psycopg2.connect(
+            dbname="postgres", user=db_user, password=db_password, host=db_host
         )
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
+        exists = cursor.fetchone()
 
-        if book_count == 0:
-            raise RuntimeError("No books found in database before starting server!")
+        if not exists:
+            cursor.execute(f'CREATE DATABASE "{db_name}"')
+            print(f"Created test database '{db_name}'")
+        else:
+            print(f"Test database '{db_name}' already exists")
+
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not create database: {e}")
+
+    print("Running migrations...")
+    migrate_result = subprocess.run(
+        ["python", "manage.py", "migrate"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
+    )
+
+    if migrate_result.returncode != 0:
+        print(f"Migration output: {migrate_result.stdout}")
+        print(f"Migration errors: {migrate_result.stderr}")
 
     print("Starting Django development server...")
-
     server_process = subprocess.Popen(
         ["python", "manage.py", "runserver"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        cwd=project_root,
         env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings.testing"},
     )
 
-    server_url = "http://127.0.0.1:8000"
+    server_url = "http://localhost:8000"
     max_attempts = 30
     for i in range(max_attempts):
         try:
