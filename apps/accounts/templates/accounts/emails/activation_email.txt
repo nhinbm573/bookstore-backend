@@ -1,0 +1,21 @@
+Welcome to Bookstore!
+
+Hi {{ user.full_name }},
+
+Thank you for joining our bookstore community! We're excited to have you on board.
+
+To complete your registration and start exploring our vast collection of books,
+please activate your account by visiting this link:
+
+{{ activation_link }}
+
+This activation link will expire in 24 hours for security reasons.
+
+If you didn't create an account with us, please ignore this email.
+
+Need help? Contact us at support@bookstore.com
+
+Best regards,
+The Bookstore Team
+
+© 2024 Bookstore. All rights reserved.

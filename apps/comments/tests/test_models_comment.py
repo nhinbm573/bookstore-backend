@@ -855,10 +855,12 @@ def test_filter_comments_by_account(comment_factory, account_factory, category_f
 
 
 @pytest.mark.unit
-def test_filter_comments_by_book(comment_factory, book_factory):
+def test_filter_comments_by_book(comment_factory, book_factory, category_factory):
     """Test filtering all comments by specific book."""
-    book1 = book_factory.create()
-    book2 = book_factory.create()
+    category = category_factory()
+
+    book1 = book_factory.create(category=category)
+    book2 = book_factory.create(category=category)
 
     comment_factory.create(book=book1, rating=5)
     comment_factory.create(book=book1, rating=4)

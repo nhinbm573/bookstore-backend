@@ -25,3 +25,12 @@ DATABASES = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
+
+# Email configuration
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
+)
+DEFAULT_FROM_EMAIL = config("DB_PORT", default="noreply@bookstore.com")
+EMAIL_HOST = config("EMAIL_HOST", default="localhost")
+EMAIL_PORT = config("EMAIL_PORT", default="1025")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False)
