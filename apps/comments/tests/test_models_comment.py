@@ -871,15 +871,17 @@ def test_filter_comments_by_book(comment_factory, book_factory, category_factory
 
 
 @pytest.mark.unit
-def test_filter_comments_by_date_range(comment_factory):
+def test_filter_comments_by_date_range(comment_factory, category_factory):
     """Test filtering comments within date range."""
     from datetime import timedelta
 
     now = timezone.now()
     week_ago = now - timedelta(days=7)
 
+    category = category_factory()
+
     # Create old comment
-    old_comment = comment_factory.create()
+    old_comment = comment_factory.create(book__category=category)
 
     # Use update() to bypass auto_now_add restriction for testing
     comment_factory._meta.model.objects.filter(id=old_comment.id).update(
@@ -888,7 +890,7 @@ def test_filter_comments_by_date_range(comment_factory):
     old_comment.refresh_from_db()
 
     # Create recent comment
-    recent_comment = comment_factory.create()
+    recent_comment = comment_factory.create(book__category=category)
 
     recent_comments = list(
         comment_factory._meta.model.objects.filter(comment_date__gte=week_ago)

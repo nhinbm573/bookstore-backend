@@ -1,4 +1,3 @@
-from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import generics, status
@@ -23,8 +22,7 @@ class SignupView(generics.CreateAPIView):
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = account_activation_token.make_token(user)
-        path = reverse("account-activate", kwargs={"uidb64": uid, "token": token})
-        activation_link = f"{FRONTEND_DOMAIN}{path}"
+        activation_link = f"{FRONTEND_DOMAIN}/activate/{uid}/{token}"
 
         send_activation_email.delay(user.id, activation_link)
 
