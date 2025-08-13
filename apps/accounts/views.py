@@ -10,7 +10,12 @@ from urllib.parse import urlparse
 
 from config.settings.base import FRONTEND_DOMAIN
 from .models import Account
-from .serializers import SignupSerializer, LoginSerializer, RefreshTokenSerializer
+from .serializers import (
+    SignupSerializer,
+    LoginSerializer,
+    RefreshTokenSerializer,
+    GoogleSignInSerializer,
+)
 from .tokens import account_activation_token
 from .tasks import send_activation_email
 
@@ -193,4 +198,57 @@ class RefreshTokenView(APIView):
         return Response(
             {"message": error_message, "status": 401},
             status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+
+class GoogleSignInView(APIView):
+    def post(self, request):
+        serializer = GoogleSignInSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+
+            refresh = RefreshToken.for_user(user)
+            access_token = refresh.access_token
+
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+
+            response_data = {
+                "message": "Google Sign-In successful.",
+                "status": 200,
+                "data": {
+                    "access": str(access_token),
+                    "account": {
+                        "id": user.id,
+                        "email": user.email,
+                        "full_name": user.full_name,
+                        "phone": user.phone,
+                        "birthday": user.birthday,
+                        "is_google_user": user.is_google_user,
+                    },
+                },
+            }
+
+            response = Response(response_data, status=status.HTTP_200_OK)
+
+            parsed_url = urlparse(FRONTEND_DOMAIN)
+            cookie_domain = parsed_url.hostname if parsed_url.hostname else None
+
+            response.set_cookie(
+                key="refresh_token",
+                value=str(refresh),
+                max_age=60 * 60 * 24 * 7,
+                httponly=True,
+                samesite="Lax",
+                secure=not settings.DEBUG,
+                domain=cookie_domain if not settings.DEBUG else None,
+            )
+
+            return response
+
+        error_message = serializer.errors.get("message", ["Google Sign-In failed."])[0]
+        return Response(
+            {"message": error_message, "status": 400},
+            status=status.HTTP_400_BAD_REQUEST,
         )

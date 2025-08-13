@@ -1,5 +1,11 @@
 from django.urls import path
-from .views import SignupView, AccountActivateView, LoginView, RefreshTokenView
+from .views import (
+    SignupView,
+    AccountActivateView,
+    LoginView,
+    RefreshTokenView,
+    GoogleSignInView,
+)
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"),
@@ -10,4 +16,5 @@ urlpatterns = [
     ),
     path("login/", LoginView.as_view(), name="login"),
     path("refresh/", RefreshTokenView.as_view(), name="refresh-token"),
+    path("google/", GoogleSignInView.as_view(), name="google-signin"),
 ]

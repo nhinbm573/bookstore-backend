@@ -6,10 +6,14 @@ from rest_framework_simplejwt.exceptions import TokenError
 from .models import Account
 import requests
 from django.conf import settings
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    phone = serializers.CharField(max_length=20, required=True)
+    birthday = serializers.DateField(required=True)
 
     class Meta:
         model = Account
@@ -120,5 +124,88 @@ class RefreshTokenSerializer(serializers.Serializer):
 
         except TokenError:
             raise serializers.ValidationError({"message": "Invalid or expired token."})
+
+        return attrs
+
+
+class GoogleSignInSerializer(serializers.Serializer):
+    credential = serializers.CharField()
+
+    def validate(self, attrs):
+        credential = attrs.get("credential")
+
+        try:
+            google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", None)
+            if not google_client_id:
+                raise serializers.ValidationError(
+                    {"message": "Google Sign-In is not configured."}
+                )
+
+            idinfo = id_token.verify_oauth2_token(
+                credential, google_requests.Request(), google_client_id
+            )
+
+            if idinfo["iss"] not in [
+                "accounts.google.com",
+                "https://accounts.google.com",
+            ]:
+                raise serializers.ValidationError({"message": "Invalid token issuer."})
+
+            if idinfo.get("aud") != google_client_id:
+                raise serializers.ValidationError(
+                    {"message": "Invalid token audience."}
+                )
+
+            email = idinfo.get("email")
+            if not email:
+                raise serializers.ValidationError(
+                    {"message": "Email not found in Google account."}
+                )
+
+            if not idinfo.get("email_verified"):
+                raise serializers.ValidationError(
+                    {"message": "Google email not verified."}
+                )
+
+            google_id = idinfo.get("sub")
+            full_name = idinfo.get("name", "")
+
+            try:
+                account = Account.objects.get(email=email)
+
+                if not account.is_google_user:
+                    account.is_google_user = True
+                    account.google_id = google_id
+                    account.save(update_fields=["is_google_user", "google_id"])
+                elif account.google_id != google_id:
+                    raise serializers.ValidationError(
+                        {
+                            "message": "Email already associated with different Google account."
+                        }
+                    )
+
+            except Account.DoesNotExist:
+                account = Account.objects.create(
+                    email=email,
+                    full_name=full_name,
+                    is_active=True,
+                    is_google_user=True,
+                    google_id=google_id,
+                )
+                account.set_unusable_password()
+                account.save()
+
+            attrs["user"] = account
+            attrs["idinfo"] = idinfo
+
+        except serializers.ValidationError:
+            # Re-raise validation errors without catching them
+            raise
+        except ValueError as e:
+            raise serializers.ValidationError({"message": f"Invalid token: {str(e)}"})
+        except Exception:
+            raise serializers.ValidationError(
+                {"message": "Failed to verify Google token."}
+            )
 
         return attrs

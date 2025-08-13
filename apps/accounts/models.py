@@ -6,11 +6,13 @@ from .managers import AccountManager
 
 class Account(AbstractBaseUser):
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=20, blank=True, null=True)
     full_name = models.CharField(max_length=255)
-    birthday = models.DateField()
+    birthday = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
+    is_google_user = models.BooleanField(default=False)
+    google_id = models.CharField(max_length=255, blank=True, null=True)
     date_joined = models.DateTimeField(auto_now_add=True)
     objects = AccountManager()
     USERNAME_FIELD = "email"

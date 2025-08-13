@@ -163,6 +163,9 @@ CELERY_TIMEZONE = TIME_ZONE
 # Frontend domain
 FRONTEND_DOMAIN = config("FRONTEND_DOMAIN", default="http://localhost:5173/")
 
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
+
 
 # reCAPTCHA Settings
 RECAPTCHA_SITE_KEY = config("SITE_KEY", default="")

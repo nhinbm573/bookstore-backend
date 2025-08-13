@@ -6,6 +6,7 @@ djangorestframework==3.15.2
 djangorestframework-camel-case==1.4.2
 djangorestframework-simplejwt==5.3.1
 django-cors-headers==4.7.0
+google-auth==2.40.3
 psycopg2-binary==2.9.10
 python-decouple==3.8
 redis==6.3.0

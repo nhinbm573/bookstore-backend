@@ -8,12 +8,17 @@ class AccountManager(BaseUserManager):
         """
         if not email:
             raise ValueError("The Email field must be set")
-        if not phone:
-            raise ValueError("The Phone field must be set")
+
+        is_google_user = extra_fields.get("is_google_user", False)
+
+        if not is_google_user:
+            if not phone:
+                raise ValueError("The Phone field must be set")
+            if not birthday:
+                raise ValueError("The Birthday field must be set")
+
         if not full_name:
             raise ValueError("The Full Name field must be set")
-        if not birthday:
-            raise ValueError("The Birthday field must be set")
 
         email = self.normalize_email(email)
         user = self.model(
