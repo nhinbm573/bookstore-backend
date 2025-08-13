@@ -11,7 +11,7 @@ def test_login_view_success(api_client, account_factory):
     """Test successful login with valid credentials."""
     password = "TestPass123"
     account = account_factory.create(
-        email="user@example.com", password=password, is_active=True
+        email="hello_01@gmail.com", password=password, is_active=True
     )
 
     url = reverse("login")
@@ -33,7 +33,7 @@ def test_login_view_success(api_client, account_factory):
 def test_login_view_invalid_credentials(api_client, account_factory):
     """Test login fails with invalid credentials."""
     account = account_factory.create(
-        email="user@example.com", password="CorrectPass123", is_active=True
+        email="hello_01@gmail.com", password="CorrectPass123", is_active=True
     )
 
     url = reverse("login")
