@@ -5,6 +5,7 @@ from django.conf import settings
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from urllib.parse import urlparse
 
@@ -252,3 +253,26 @@ class GoogleSignInView(APIView):
             {"message": error_message, "status": 400},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        response_data = {
+            "message": "Logout successful.",
+            "status": 200,
+        }
+
+        response = Response(response_data, status=status.HTTP_200_OK)
+
+        parsed_url = urlparse(FRONTEND_DOMAIN)
+        cookie_domain = parsed_url.hostname if parsed_url.hostname else None
+
+        response.delete_cookie(
+            key="refresh_token",
+            domain=cookie_domain if not settings.DEBUG else None,
+            samesite="Lax",
+        )
+
+        return response
