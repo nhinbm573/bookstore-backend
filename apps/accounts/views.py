@@ -16,9 +16,11 @@ from .serializers import (
     LoginSerializer,
     RefreshTokenSerializer,
     GoogleSignInSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
 )
-from .tokens import account_activation_token
-from .tasks import send_activation_email
+from .tokens import account_activation_token, password_reset_token
+from .tasks import send_activation_email, send_password_reset_email
 
 
 class SignupView(generics.CreateAPIView):
@@ -276,3 +278,69 @@ class LogoutView(APIView):
         )
 
         return response
+
+
+class PasswordResetRequestView(APIView):
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+
+            try:
+                user = Account.objects.get(email=email)
+
+                if user.is_active:
+                    uid = urlsafe_base64_encode(force_bytes(user.pk))
+                    token = password_reset_token.make_token(user)
+                    reset_link = f"{FRONTEND_DOMAIN}/reset-password/{uid}/{token}"
+                    send_password_reset_email.delay(user.id, reset_link)
+            except Account.DoesNotExist:
+                pass
+
+            return Response(
+                {
+                    "message": (
+                        "If an account exists for this email, you will receive a "
+                        "password reset link."
+                    ),
+                    "status": 200,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {"message": "Invalid email address.", "status": 400},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+            new_password = serializer.validated_data["new_password"]
+
+            user.set_password(new_password)
+            user.save()
+
+            return Response(
+                {
+                    "message": (
+                        "Password has been reset successfully. You can now log in "
+                        "with your new password."
+                    ),
+                    "status": 200,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        error_message = serializer.errors.get(
+            "message", ["Invalid or expired password reset link."]
+        )[0]
+        return Response(
+            {"message": error_message, "status": 400},
+            status=status.HTTP_400_BAD_REQUEST,
+        )

@@ -65,3 +65,25 @@ def invalid_birthday_account(db):
 @pytest.fixture
 def api_client(db):
     return APIClient()
+
+
+@pytest.fixture
+def active_account(db, account_factory):
+    """Create an active account for testing."""
+    account = account_factory.create(
+        email="active@example.com", full_name="Active User", is_active=True
+    )
+    account.set_password("TestPassword123!")
+    account.save()
+    return account
+
+
+@pytest.fixture
+def inactive_account(db, account_factory):
+    """Create an inactive account for testing."""
+    account = account_factory.create(
+        email="inactive@example.com", full_name="Inactive User", is_active=False
+    )
+    account.set_password("TestPassword123!")
+    account.save()
+    return account

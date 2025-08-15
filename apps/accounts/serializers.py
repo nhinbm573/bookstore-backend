@@ -3,7 +3,10 @@ from django.contrib.auth import authenticate
 from django.core.cache import cache
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from .models import Account
+from .tokens import password_reset_token
 import requests
 from django.conf import settings
 from google.oauth2 import id_token
@@ -199,7 +202,6 @@ class GoogleSignInSerializer(serializers.Serializer):
             attrs["idinfo"] = idinfo
 
         except serializers.ValidationError:
-            # Re-raise validation errors without catching them
             raise
         except ValueError as e:
             raise serializers.ValidationError({"message": f"Invalid token: {str(e)}"})
@@ -208,4 +210,34 @@ class GoogleSignInSerializer(serializers.Serializer):
                 {"message": "Failed to verify Google token."}
             )
 
+        return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uidb_64 = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate(self, attrs):
+        try:
+            uid = force_str(urlsafe_base64_decode(attrs["uidb_64"]))
+            user = Account.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, Account.DoesNotExist):
+            raise serializers.ValidationError(
+                {"message": "Invalid password reset link."}
+            )
+
+        if not password_reset_token.check_token(user, attrs["token"]):
+            raise serializers.ValidationError(
+                {"message": "Invalid or expired password reset link."}
+            )
+
+        attrs["user"] = user
         return attrs
