@@ -8,6 +8,7 @@ from .views import (
     GoogleSignInView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
+    EditUserInfoView,
 )
 
 urlpatterns = [
@@ -31,4 +32,5 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password-reset-confirm",
     ),
+    path("me/edit/", EditUserInfoView.as_view(), name="edit-user-info"),
 ]

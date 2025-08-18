@@ -18,6 +18,7 @@ from .serializers import (
     GoogleSignInSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
+    EditUserInfoSerializer,
 )
 from .tokens import account_activation_token, password_reset_token
 from .tasks import send_activation_email, send_password_reset_email
@@ -344,3 +345,29 @@ class PasswordResetConfirmView(APIView):
             {"message": error_message, "status": 400},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+class EditUserInfoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        serializer = EditUserInfoSerializer(user, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            response_data = {
+                "message": "User info updated successfully.",
+                "status": 200,
+                "data": {
+                    "account": {
+                        "email": user.email,
+                        "full_name": user.full_name,
+                        "phone": user.phone,
+                        "birthday": user.birthday,
+                    },
+                },
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

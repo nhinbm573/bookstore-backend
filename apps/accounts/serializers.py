@@ -241,3 +241,48 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         attrs["user"] = user
         return attrs
+
+
+class EditUserInfoSerializer(serializers.ModelSerializer):
+    old_password = serializers.CharField(write_only=True, required=False)
+    new_password = serializers.CharField(write_only=True, required=False, min_length=6)
+
+    class Meta:
+        model = Account
+        fields = ["full_name", "phone", "birthday", "old_password", "new_password"]
+
+    def validate(self, attrs):
+        old_password = attrs.get("old_password")
+        new_password = attrs.get("new_password")
+
+        if old_password or new_password:
+            if not old_password:
+                raise serializers.ValidationError(
+                    {"old_password": "This field is required when changing password."}
+                )
+            if not new_password:
+                raise serializers.ValidationError(
+                    {"new_password": "This field is required when changing password."}
+                )
+
+            user = self.instance
+            if not user.check_password(old_password):
+                raise serializers.ValidationError(
+                    {"old_password": "Old password is incorrect."}
+                )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        validated_data.pop("old_password", None)
+        new_password = validated_data.pop("new_password", None)
+
+        instance.full_name = validated_data.get("full_name", instance.full_name)
+        instance.phone = validated_data.get("phone", instance.phone)
+        instance.birthday = validated_data.get("birthday", instance.birthday)
+
+        if new_password:
+            instance.set_password(new_password)
+
+        instance.save()
+        return instance
