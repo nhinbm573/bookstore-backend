@@ -54,6 +54,13 @@ PROD_APPS = [
 INSTALLED_APPS += PROD_APPS
 
 
+# CORS settings for production
+CORS_ALLOWED_ORIGINS = [
+    config("FRONTEND_DOMAIN", default="https://bookstore-frontend-silk.vercel.app"),
+]
+CORS_ALLOW_CREDENTIALS = True
+
+
 # Logging
 LOGGING = {
     "version": 1,
