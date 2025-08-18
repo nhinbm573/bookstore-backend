@@ -12,7 +12,7 @@ fi
 
 # 2. Activate virtual environment
 echo "🐍 Activating virtual environment..."
-source env/bin/activate
+source venv/bin/activate
 
 # 3. Upgrade pip
 echo "⬆️ Upgrading pip..."
@@ -26,5 +26,10 @@ pip install -r requirements-dev.txt
 echo "⛓️ Installing pre-commit hook..."
 pre-commit install
 
+# 6. Seed database with initial data
+echo "🌱 Seeding database with initial data..."
+python manage.py migrate
+python manage.py seed_data
+
 echo "✅ All set! You can now run the server with:"
-echo "   source env/bin/activate && python manage.py runserver"
+echo "source venv/bin/activate && python manage.py runserver"

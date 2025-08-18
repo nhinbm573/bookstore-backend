@@ -1,0 +1,288 @@
+from rest_framework import serializers
+from django.contrib.auth import authenticate
+from django.core.cache import cache
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from .models import Account
+from .tokens import password_reset_token
+import requests
+from django.conf import settings
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+
+class SignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=6)
+    phone = serializers.CharField(max_length=20, required=True)
+    birthday = serializers.DateField(required=True)
+
+    class Meta:
+        model = Account
+        fields = ["email", "password", "phone", "full_name", "birthday"]
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        account = Account.objects.create_user(
+            email=validated_data["email"],
+            phone=validated_data["phone"],
+            full_name=validated_data["full_name"],
+            birthday=validated_data["birthday"],
+            password=password,
+        )
+        return account
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    captcha = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+        captcha = attrs.get("captcha", "")
+
+        request = self.context.get("request")
+        ip_address = request.META.get("REMOTE_ADDR", "unknown")
+
+        cache_key = f"failed_attempts:{email}:{ip_address}"
+        failed_attempts = cache.get(cache_key, 0)
+
+        if failed_attempts >= 3:
+            if not captcha:
+                raise serializers.ValidationError(
+                    {
+                        "message": "Captcha verification required after multiple failed attempts."
+                    }
+                )
+
+            if not self.verify_captcha(captcha):
+                raise serializers.ValidationError(
+                    {"message": "Invalid captcha. Please try again."}
+                )
+
+        user = authenticate(request=request, username=email, password=password)
+
+        if not user:
+            new_failed_attempts = failed_attempts + 1
+            cache.set(cache_key, new_failed_attempts, timeout=1800)  # 30 minutes
+
+            if new_failed_attempts >= 3:
+                raise serializers.ValidationError(
+                    {
+                        "message": "Invalid credentials. Captcha required for next attempt."
+                    }
+                )
+            else:
+                raise serializers.ValidationError({"message": "Invalid credentials."})
+
+        if not user.is_active:
+            raise serializers.ValidationError({"message": "Invalid credentials."})
+
+        cache.delete(cache_key)
+
+        attrs["user"] = user
+        return attrs
+
+    def verify_captcha(self, captcha_token):
+        """
+        Verify Google reCAPTCHA token with Google's API
+        """
+        recaptcha_secret = settings.RECAPTCHA_SECRET_KEY
+
+        if not recaptcha_secret:
+            return True
+
+        verification_url = "https://www.google.com/recaptcha/api/siteverify"
+        data = {
+            "secret": recaptcha_secret,
+            "response": captcha_token,
+        }
+
+        try:
+            response = requests.post(verification_url, data=data, timeout=5)
+            result = response.json()
+            return result.get("success", False)
+        except Exception:
+            return False
+
+
+class RefreshTokenSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+
+    def validate(self, attrs):
+        refresh_token = attrs.get("refresh")
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            user = refresh.payload.get("user_id")
+
+            if not user:
+                raise serializers.ValidationError({"message": "Invalid token."})
+
+            attrs["refresh"] = refresh
+            attrs["access"] = refresh.access_token
+
+        except TokenError:
+            raise serializers.ValidationError({"message": "Invalid or expired token."})
+
+        return attrs
+
+
+class GoogleSignInSerializer(serializers.Serializer):
+    credential = serializers.CharField()
+
+    def validate(self, attrs):
+        credential = attrs.get("credential")
+
+        try:
+            google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", None)
+            if not google_client_id:
+                raise serializers.ValidationError(
+                    {"message": "Google Sign-In is not configured."}
+                )
+
+            idinfo = id_token.verify_oauth2_token(
+                credential, google_requests.Request(), google_client_id
+            )
+
+            if idinfo["iss"] not in [
+                "accounts.google.com",
+                "https://accounts.google.com",
+            ]:
+                raise serializers.ValidationError({"message": "Invalid token issuer."})
+
+            if idinfo.get("aud") != google_client_id:
+                raise serializers.ValidationError(
+                    {"message": "Invalid token audience."}
+                )
+
+            email = idinfo.get("email")
+            if not email:
+                raise serializers.ValidationError(
+                    {"message": "Email not found in Google account."}
+                )
+
+            if not idinfo.get("email_verified"):
+                raise serializers.ValidationError(
+                    {"message": "Google email not verified."}
+                )
+
+            google_id = idinfo.get("sub")
+            full_name = idinfo.get("name", "")
+
+            try:
+                account = Account.objects.get(email=email)
+
+                if not account.is_google_user:
+                    account.is_google_user = True
+                    account.google_id = google_id
+                    account.save(update_fields=["is_google_user", "google_id"])
+                elif account.google_id != google_id:
+                    raise serializers.ValidationError(
+                        {
+                            "message": "Email already associated with different Google account."
+                        }
+                    )
+
+            except Account.DoesNotExist:
+                account = Account.objects.create(
+                    email=email,
+                    full_name=full_name,
+                    is_active=True,
+                    is_google_user=True,
+                    google_id=google_id,
+                )
+                account.set_unusable_password()
+                account.save()
+
+            attrs["user"] = account
+            attrs["idinfo"] = idinfo
+
+        except serializers.ValidationError:
+            raise
+        except ValueError as e:
+            raise serializers.ValidationError({"message": f"Invalid token: {str(e)}"})
+        except Exception:
+            raise serializers.ValidationError(
+                {"message": "Failed to verify Google token."}
+            )
+
+        return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uidb_64 = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate(self, attrs):
+        try:
+            uid = force_str(urlsafe_base64_decode(attrs["uidb_64"]))
+            user = Account.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, Account.DoesNotExist):
+            raise serializers.ValidationError(
+                {"message": "Invalid password reset link."}
+            )
+
+        if not password_reset_token.check_token(user, attrs["token"]):
+            raise serializers.ValidationError(
+                {"message": "Invalid or expired password reset link."}
+            )
+
+        attrs["user"] = user
+        return attrs
+
+
+class EditUserInfoSerializer(serializers.ModelSerializer):
+    old_password = serializers.CharField(write_only=True, required=False)
+    new_password = serializers.CharField(write_only=True, required=False, min_length=6)
+
+    class Meta:
+        model = Account
+        fields = ["full_name", "phone", "birthday", "old_password", "new_password"]
+
+    def validate(self, attrs):
+        old_password = attrs.get("old_password")
+        new_password = attrs.get("new_password")
+
+        if old_password or new_password:
+            if not old_password:
+                raise serializers.ValidationError(
+                    {"old_password": "This field is required when changing password."}
+                )
+            if not new_password:
+                raise serializers.ValidationError(
+                    {"new_password": "This field is required when changing password."}
+                )
+
+            user = self.instance
+            if not user.check_password(old_password):
+                raise serializers.ValidationError(
+                    {"old_password": "Old password is incorrect."}
+                )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        validated_data.pop("old_password", None)
+        new_password = validated_data.pop("new_password", None)
+
+        instance.full_name = validated_data.get("full_name", instance.full_name)
+        instance.phone = validated_data.get("phone", instance.phone)
+        instance.birthday = validated_data.get("birthday", instance.birthday)
+
+        if new_password:
+            instance.set_password(new_password)
+
+        instance.save()
+        return instance

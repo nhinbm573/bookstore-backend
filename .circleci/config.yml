@@ -41,13 +41,13 @@ jobs:
           name: "Run Linters"
           command: |
             source venv/bin/activate
-            
+
             echo "Running flake8 for style guide enforcement..."
             flake8 .
-            
+
             echo "Running black to check formatting..."
             black --check .
-            
+
 
   unit_test:
     docker:
@@ -115,10 +115,10 @@ jobs:
           command: |
             mkdir -p ~/.ssh
             ssh-keyscan github.com >> ~/.ssh/known_hosts
-            
-            BRANCH_NAME=main
+
+            BRANCH_NAME=${CIRCLE_BRANCH}
             echo "Backend branch: $BRANCH_NAME"
-      
+
             for candidate in "$BRANCH_NAME" "dev" "main"; do
               echo "Checking if frontend branch '$candidate' exists..."
               if git ls-remote --exit-code --heads ${GITHUB_HTTPS} "$candidate"; then
@@ -155,14 +155,6 @@ jobs:
             echo "Postgres is up!"
 
 
-      # SETUP PLAYWRIGHT
-      - run:
-          name: "Install Playwright"
-          command: |
-            source venv/bin/activate
-            playwright install
-
-
       # RUN SERVICES
       - run:
           name: "Run Frontend Dev Server (background)"
@@ -172,28 +164,17 @@ jobs:
       - run:
           name: "Wait for Frontend Service"
           command: |
-            echo "Waiting for frontend on port 5173..."
-            WAIT_TIMEOUT=60
-            ELAPSED_TIME=0
-            while ! nc -z localhost 5173; do
-              if [ $ELAPSED_TIME -ge $WAIT_TIMEOUT ]; then
-                echo "Error: Timed out waiting for frontend service to start."
-                echo "--- Frontend server logs ---"
-                cat ../frontend-dev-server.log
-                exit 1
-              fi
-              sleep 1
-              ELAPSED_TIME=$((ELAPSED_TIME + 1))
-            done
+            echo "Waiting for frontend..."
+            dockerize -wait tcp://localhost:5173 -timeout 1m
             echo "Frontend service is up and running."
 
 
       # TEST
       - run:
-          name: "Run Playwright E2E Tests"
+          name: "Run E2E Tests"
           command: |
             source venv/bin/activate
-            pytest -m e2e
+            pytest -m e2e -n 1
 
 
 workflows:
@@ -209,4 +190,3 @@ workflows:
       - e2e_test:
           requires:
             - install_dependencies
-
