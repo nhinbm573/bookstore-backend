@@ -1,5 +1,6 @@
 from .base import *
 from decouple import config
+import dj_database_url
 
 # Security settings
 SECRET_KEY = config("SECRET_KEY")
@@ -10,16 +11,13 @@ ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(",")]
 )
 
-# Database
+# Database - Use Heroku's DATABASE_URL
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME"),
-        "USER": config("DB_USER"),
-        "PASSWORD": config("DB_PASSWORD"),
-        "HOST": config("DB_HOST", default="localhost"),
-        "PORT": config("DB_PORT", default="5432", cast=int),
-    }
+    "default": dj_database_url.config(
+        default=config("DATABASE_URL", default=""),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 
